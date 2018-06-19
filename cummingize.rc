@@ -1,0 +1,88 @@
+#!/usr/local/plan9/bin/rc
+
+fn random {
+    status=`{shuf -i 1-100 -n 1 | awk '{print ($1 > '$1' * '$cummingness')}'}
+}
+
+#o=`{sed 's/[^A-Za-z0-9 ]//g' | tr A-Z a-z}
+o=`{tr A-Z a-z | sed 's/;//g; s/[^a-z0-9]\|/\|/g; s/\| */\|/g'}
+
+if(~ `{shuf -i 1-8 -n 1} 1)
+    shortlines=yes
+
+for(word in $o) {
+    # thesaurus
+    if(random 5 && ! ~ `{dict -Cd moby-thesaurus $word >[2=1]} No*)
+        word=`{dict -d moby-thesaurus $word | sed '1,5d' | sed 's/ /\n/g' |
+               sort | uniq | awk '{print length, $0}' | sort -nr | sed 1q |
+               sed 's/^[0-9]* //'}
+
+    # caps
+    if(random 5) {
+        first=`{echo $word | awk '{print substr($0, 0, 1)}' | tr a-z A-Z}
+        rest=`{echo $word | awk '{print substr($0, 2)}'}
+        word=$first$"rest
+    }
+
+    # parens
+    if(random 3)
+        word=$word')'
+    if(random 3)
+        word='('$word
+
+    # word breaks
+    length=`{echo $word | sed 's/\|.*//' | wc -c | awk '{print $1 - 1}'}
+    if(~ $word *'|'* && random 6 && ~ `{echo $length |
+                                        awk '{print ($1 >= 3)}'} 1) {
+        after=`{echo $word | sed 's/.*\|//'}
+        word=`{echo $word | sed 's/\|.*//'}
+        split=`{shuf -i 1-`{echo $length | awk '{print $1 - 1}'} -n 1}
+        start=`{echo $word | awk '{print substr($0, 0, '$split')}'}
+        end=`{echo $word | awk '{print substr($0, '`{echo $split |
+                                                     awk '{print $1 + 1}'}^')}'}
+
+        if(random 50)
+            word=$start'-| '$end' '$"after
+        if not
+            word=$start'| '$end' '$"after
+    }
+
+    # line breaks
+    if(~ $"shortlines yes && random 30 || random 1)
+        word=$word'|'
+
+    new=$"new' '$word
+}
+o=$new
+
+# ampersands
+if(random 25)
+    o=`{echo $o | sed 's/and/\&/g'}
+
+# punctuation compression
+if(random 50)
+    o=`{echo $o | sed 's/, /,/g; s, \(,\(,g; s,\) ,\),g'}
+
+o=`{echo $o | sed 's/ /;/g; s/\|/ /g'}
+new=''
+for(line in $o) {
+    # word compression
+    if(random 5)
+        line=`{echo $line | sed 's/([^;]*);and;([^;]*)/\1and\2/'}
+
+    # quotes
+    if(random 2)
+        line='"'$line
+    if(random 2)
+        line=$line'"'
+
+    # indents
+    if(random 15)
+        for(i in `{seq `{shuf -i 0-35 -n 1}})
+            line=';'$line
+
+    new=$"new' '$line
+}
+o=`{echo $new | sed 's/ /\|/g; s/\|;/\|/g'}
+
+echo $o
